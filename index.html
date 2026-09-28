@@ -1913,6 +1913,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     sidebarHidden: 'cb_sidebar_hidden',
     showClosed: 'cb_show_closed',
     activeCase: 'cb_active_case',
+    welcomed: 'cb_welcomed',
     helpSeen: 'cb_help_seen'
   };
 
@@ -2284,6 +2285,9 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
   const MAX_ZOOM = 3;
 
   const SORTS = ['urgency', 'manual', 'color', 'client', 'casenum', 'assigned'];
+  // The welcome card only shows the very first time the app is opened in this browser
+  let firstVisit = !store.get(KEYS.welcomed) && store.get(STORAGE_KEY) === null;
+  store.set(KEYS.welcomed, '1');
   const ui = {
     call: 'all',                 // all | first | second — the 1st / 2nd call switch in the top bar
     color: null,                 // colour filter for the case list
@@ -2713,6 +2717,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
   }
 
   function renderAll() {
+    if (cases.length) firstVisit = false;
     applyLayoutClasses();
     renderSidebar();
     renderTopbar();
@@ -3066,7 +3071,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     if (!c) {
       el.dataset.mode = 'none';
       el.title = '';
-      el.append(h('span', { class: 'crumb-ref' }, cases.length ? 'No case open' : 'Welcome'),
+      el.append(h('span', { class: 'crumb-ref' }, cases.length ? 'No case open' : (firstVisit ? 'Welcome' : 'No cases yet')),
         h('span', { class: 'crumb-title' }, cases.length ? 'Pick a client on the left' : 'Case Brain'));
       return;
     }
@@ -3325,6 +3330,16 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
           h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case')));
       return;
     }
+    if (!firstVisit) {
+      box.replaceChildren(
+        h('div', { class: 'kicker' }, 'Case map'),
+        h('h2', null, 'No cases yet'),
+        h('p', null, 'Import your case list or add a case.'),
+        h('div', { class: 'empty-actions' },
+          h('button', { type: 'button', class: 'btn primary lg', onclick: () => openImport() }, 'Import my case list'),
+          h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case')));
+      return;
+    }
     box.replaceChildren(
       h('div', { class: 'kicker' }, 'Welcome'),
       h('h2', null, 'Every case, every call, on one map'),
@@ -3333,7 +3348,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
         h('button', { type: 'button', class: 'btn primary lg', onclick: () => openImport() }, 'Import my case list'),
         h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case'),
         h('button', { type: 'button', class: 'btn ghost lg', onclick: loadExample }, 'Try an example')),
-      h('div', { class: 'tiny' }, 'Tip: press ? at any time for shortcuts and help.'));
+      h('div', { class: 'tiny kbd-hint' }, 'Tip: press ? at any time for shortcuts and help.'));
   }
 
   function loadExample() {
