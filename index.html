@@ -1913,7 +1913,6 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     sidebarHidden: 'cb_sidebar_hidden',
     showClosed: 'cb_show_closed',
     activeCase: 'cb_active_case',
-    welcomed: 'cb_welcomed',
     helpSeen: 'cb_help_seen'
   };
 
@@ -2285,9 +2284,6 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
   const MAX_ZOOM = 3;
 
   const SORTS = ['urgency', 'manual', 'color', 'client', 'casenum', 'assigned'];
-  // The welcome card only shows the very first time the app is opened in this browser
-  let firstVisit = !store.get(KEYS.welcomed) && store.get(STORAGE_KEY) === null;
-  store.set(KEYS.welcomed, '1');
   const ui = {
     call: 'all',                 // all | first | second — the 1st / 2nd call switch in the top bar
     color: null,                 // colour filter for the case list
@@ -2685,18 +2681,6 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     return c;
   }
 
-  function sampleCase() {
-    const today = todayISO();
-    const c = newCase({ number: '10482914', client: 'Sarah Jenkins (example)', assigned: addDays(today, -3), color: '#0ea5e9', firstCall: false });
-    const root = rootOf(c);
-    root.text = 'Example case — right-click anything to see what you can do. Delete it whenever you like.';
-    c.nodes.push(
-      { id: makeId('node'), type: 'First Call', text: 'Introduce myself and confirm documents', x: 330, y: -150, w: 260, h: 120, parentId: root.id, dueDate: today, dueTime: null, isCompleted: false, collapsed: false, color: null },
-      { id: makeId('node'), type: 'Email', text: 'Email branch manager about the signature card', x: 330, y: 20, w: 260, h: 100, parentId: root.id, dueDate: addBusinessDays(today, 1), isCompleted: false, collapsed: false, color: '#14b8a6' },
-      { id: makeId('node'), type: 'Note', text: 'Client is only available between 1 and 4 PM.', x: 330, y: 170, w: 360, h: 90, parentId: root.id, isNote: true, dueDate: null, isCompleted: false, collapsed: false, color: null }
-    );
-    return c;
-  }
 
   // ==========================================================================
   // RENDER — overall
@@ -2717,7 +2701,6 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
   }
 
   function renderAll() {
-    if (cases.length) firstVisit = false;
     applyLayoutClasses();
     renderSidebar();
     renderTopbar();
@@ -3071,7 +3054,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     if (!c) {
       el.dataset.mode = 'none';
       el.title = '';
-      el.append(h('span', { class: 'crumb-ref' }, cases.length ? 'No case open' : (firstVisit ? 'Welcome' : 'No cases yet')),
+      el.append(h('span', { class: 'crumb-ref' }, cases.length ? 'No case open' : 'No cases yet'),
         h('span', { class: 'crumb-title' }, cases.length ? 'Pick a client on the left' : 'Case Brain'));
       return;
     }
@@ -3330,33 +3313,13 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
           h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case')));
       return;
     }
-    if (!firstVisit) {
-      box.replaceChildren(
-        h('div', { class: 'kicker' }, 'Case map'),
-        h('h2', null, 'No cases yet'),
-        h('p', null, 'Import your case list or add a case.'),
-        h('div', { class: 'empty-actions' },
-          h('button', { type: 'button', class: 'btn primary lg', onclick: () => openImport() }, 'Import my case list'),
-          h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case')));
-      return;
-    }
     box.replaceChildren(
-      h('div', { class: 'kicker' }, 'Welcome'),
-      h('h2', null, 'Every case, every call, on one map'),
-      h('p', null, 'Start by importing the list you work from each day — paste it from Excel or an email, or turn a screenshot into a list with the ready-made AI prompt. Or add a single case by hand.'),
+      h('div', { class: 'kicker' }, 'Case map'),
+      h('h2', null, 'No cases yet'),
+      h('p', null, 'Import your case list or add a case.'),
       h('div', { class: 'empty-actions' },
         h('button', { type: 'button', class: 'btn primary lg', onclick: () => openImport() }, 'Import my case list'),
-        h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case'),
-        h('button', { type: 'button', class: 'btn ghost lg', onclick: loadExample }, 'Try an example')),
-      h('div', { class: 'tiny kbd-hint' }, 'Tip: press ? at any time for shortcuts and help.'));
-  }
-
-  function loadExample() {
-    const c = sampleCase();
-    cases.unshift(c);
-    save();
-    openCase(c.id, { fit: true });
-    toast('Example case added — delete it whenever you like');
+        h('button', { type: 'button', class: 'btn lg', onclick: () => openNewCase() }, '+ New case')));
   }
 
   // ==========================================================================
