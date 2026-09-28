@@ -525,7 +525,7 @@ button.type-badge:hover { filter: brightness(1.12); }
   align-items: flex-start;
   justify-content: center;
   min-width: 0;
-  max-width: 400px;
+  max-width: 330px;
   height: 48px;
   padding: 0 34px 0 16px;
   border: 0;
@@ -699,6 +699,12 @@ button.grp:hover { color: var(--text); }
 .cr-end.overdue b { color: var(--red); }
 .cr-end.today b { color: var(--gold); }
 .cr-end.none b { color: var(--text-3); font-weight: 500; }
+.case-row.day-row { --cc: var(--gold); margin: 12px 0 4px; border-color: color-mix(in srgb, var(--gold) 30%, transparent); background: color-mix(in srgb, var(--gold) 6%, transparent); }
+.case-row.day-row:hover { background: color-mix(in srgb, var(--gold) 11%, transparent); }
+.case-row.day-row.on { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-soft); }
+.case-row.day-row .av { color: var(--gold); background: var(--gold-soft); box-shadow: inset 0 0 0 1.5px var(--gold); font: 600 16px/1 var(--mono); border-radius: 12px; }
+.case-row.day-row .cr-name { font: 400 17px/1.2 var(--serif); }
+.case-row.day-row .late { color: var(--red); }
 .cr-handle { display: grid; place-items: center; width: 18px; height: 36px; border-radius: 6px; color: var(--text-3); cursor: grab; touch-action: none; font-size: 13px; letter-spacing: -2px; }
 .cr-handle:hover { background: var(--hover); color: var(--text); }
 
@@ -1378,7 +1384,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     <button type="button" id="crumb" class="crumb" title="Case options"></button>
 
     <div class="kpis" id="kpis">
-      <button type="button" class="kpi today" data-kpi="today" title="Everything due today — map or list"><b id="kpi-today">0</b><span>Due today</span></button>
+      <button type="button" class="kpi today" data-kpi="today" title="Open today's map — every case due today"><b id="kpi-today">0</b><span>Due today</span></button>
       <button type="button" class="kpi overdue" data-kpi="overdue" title="Actions past their due date"><b id="kpi-overdue">0</b><span>Overdue</span></button>
       <button type="button" class="kpi first t-first" data-kpi="first" title="Show only cases waiting on a 1st call" aria-pressed="false"><b id="kpi-first">0</b><span><i class="num">1</i>1st calls</span></button>
       <button type="button" class="kpi second t-second" data-kpi="second" title="Show only cases waiting on a 2nd call" aria-pressed="false"><b id="kpi-second">0</b><span><i class="num">2</i>2nd calls</span></button>
@@ -2309,7 +2315,6 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     filter: '',
     showClosed: store.get(KEYS.showClosed) === 'true',
     showCompleted: false,
-    dayMode: store.get(KEYS.dayMode) === 'list' ? 'list' : 'map',
     sidebarHidden: store.get(KEYS.sidebarHidden) === 'true',
     drawerOpen: false
   };
@@ -2833,6 +2838,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
 
     const listEl = $('#case-list');
     listEl.replaceChildren();
+    if (cases.length) listEl.append(buildDayRow(today));
     if (!list.length) {
       sidebarOrder = [];
       listEl.append(emptyListMessage());
@@ -2876,6 +2882,35 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     }
     listEl.append(frag);
     sidebarOrder = order;
+  }
+
+  // First row of the list: one click opens today's mind map (every case due today as cards)
+  function buildDayRow(today) {
+    let due = 0;
+    let overdue = 0;
+    const casesDue = new Set();
+    workCases().forEach(c => c.nodes.forEach(n => {
+      if (n.isRoot || n.isCompleted || !n.dueDate) return;
+      if (n.dueDate === today) {
+        due++;
+        casesDue.add(c.id);
+      } else if (n.dueDate < today) {
+        overdue++;
+      }
+    }));
+    const on = view === 'canvas' && dayMapActive;
+    return h('div', {
+      class: 'case-row day-row' + (on ? ' on' : ''),
+      role: 'listitem',
+      tabindex: '0',
+      'data-day': '1',
+      title: "Today's map — every case due today, as a mind map"
+    },
+      h('span', { class: 'av', 'aria-hidden': 'true' }, String(parseISO(today).getDate())),
+      h('span', { class: 'cr-main' },
+        h('span', { class: 'cr-name' }, "Today's map"),
+        h('span', { class: 'cr-sub' }, due ? `${plural(casesDue.size, 'case')} · ${due} due` : 'Nothing due today', overdue ? h('span', { class: 'late' }, ` · ${overdue} overdue`) : null)),
+      h('span', { class: 'cr-end today' }, h('b', null, fmtWeekday(today)), h('small', null, 'Open map')));
   }
 
   function groupHeader(g, n, opts = {}) {
@@ -4532,6 +4567,10 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     const row = e.target.closest('.case-row');
     if (!row || e.target.closest('.cr-handle')) return;
     if (recentLongPress()) return;
+    if (row.dataset.day) {
+      if (!(view === 'canvas' && dayMapActive)) openDayMap();
+      return;
+    }
     openCase(row.dataset.id);
   });
 
@@ -4549,7 +4588,8 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     if (!row || e.target !== row) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      openCase(row.dataset.id);
+      if (row.dataset.day) openDayMap();
+      else openCase(row.dataset.id);
     } else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
       e.preventDefault();
       const r = row.getBoundingClientRect();
@@ -6803,22 +6843,23 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     applyTheme(document.body.classList.contains('theme-light') ? 'dark' : 'light');
   }
 
-  // "Due today" in the top bar: open the day (map or list); click again to go back
+  // "Due today" / "Today": always opens the day as a mind map; click again to go back
   function toggleToday() {
     if (view === 'today' || (view === 'canvas' && dayMapActive)) {
       setView('canvas');
       return;
     }
+    openDayMap();
+  }
+
+  function openDayMap() {
     feedDay = null;
-    if (ui.dayMode === 'map') enterDayMap();
-    else setView('today');
+    enterDayMap();
   }
 
   function setDayMode(mode) {
-    ui.dayMode = mode === 'list' ? 'list' : 'map';
-    store.set(KEYS.dayMode, ui.dayMode);
-    if (ui.dayMode === 'map') enterDayMap();
-    else setView('today');
+    if (mode === 'list') setView('today');
+    else enterDayMap();
   }
 
   // ==========================================================================
@@ -7350,9 +7391,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
     });
     $('#btn-sweep-finish').addEventListener('click', () => {
       closeModal('modal-sweep');
-      feedDay = null;
-      if (ui.dayMode === 'map') enterDayMap();
-      else setView('today');
+      openDayMap();
     });
     $('#sweep-actions').addEventListener('change', e => {
       if (!e.target.classList.contains('done-box')) return;
@@ -7422,6 +7461,7 @@ body.modal-open #toasts { top: 18px; bottom: auto; }
 
   function init() {
     applyTheme(store.get(KEYS.theme) === 'light' ? 'light' : 'dark');
+    store.remove(KEYS.dayMode); // older versions could remember "list" here; the day always opens as a map now
     loadData();
     const remembered = store.get(KEYS.activeCase);
     activeCaseId = remembered && caseById(remembered) ? remembered : (cases[0] ? cases[0].id : null);
